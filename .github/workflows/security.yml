@@ -1,0 +1,21 @@
+name: Security
+on:
+  push:
+    branches: [development, "agent/**"]
+  pull_request:
+    branches: [development, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scan tracked history for secrets
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

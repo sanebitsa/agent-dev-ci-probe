@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Publish this local git repository and mark GitHub source as reusable template.
+# Only repository creation/publishing is automated; security provisioning is not.
+set -euo pipefail
+if [[ $# -ne 1 ]]; then
+  echo 'Usage: scripts/publish OWNER/REPO' >&2
+  exit 2
+fi
+TARGET="$1"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+command -v gh >/dev/null || { echo 'gh CLI is required' >&2; exit 1; }
+gh auth status >/dev/null
+[[ "$(git branch --show-current)" == main ]] || { echo 'Publish from main branch only' >&2; exit 1; }
+[[ -z "$(git status --porcelain)" ]] || { echo 'Working tree must be clean' >&2; exit 1; }
+if gh repo view "$TARGET" >/dev/null 2>&1; then
+  echo "BLOCKED: $TARGET exists. This script refuses to overwrite repositories." >&2
+  exit 1
+fi
+# A clone of agent-dev.bundle has a local bundle as its origin; preserve it.
+if git remote get-url origin >/dev/null 2>&1; then
+  current_origin="$(git remote get-url origin)"
+  if [[ "$current_origin" == *.bundle ]]; then
+    if git remote get-url bundle-source >/dev/null 2>&1; then
+      echo 'BLOCKED: bundle-source remote already exists' >&2
+      exit 1
+    fi
+    git remote rename origin bundle-source
+  else
+    echo "BLOCKED: remote origin already exists ($current_origin)" >&2
+    exit 1
+  fi
+fi
+gh repo create "$TARGET" --private --source . --remote origin --push
+gh repo edit "$TARGET" --template
+if ! git show-ref --verify --quiet refs/heads/development; then
+  git branch development main
+fi
+git push origin development
+printf '\nPublished https://github.com/%s\n' "$TARGET"
+echo 'NOT READY FOR AUTONOMY: configure and audit trusted review, branch rulesets and credentials (see provisioning/README.md).'

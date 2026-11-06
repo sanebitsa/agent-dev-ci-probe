@@ -1,0 +1,85 @@
+# Manually dispatched trusted integration entrypoint. Event-driven dispatch is M3 work.
+# No PR-controlled code is executed with integration credentials.
+name: Trusted Integration
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR number targeting development
+        required: true
+        type: number
+permissions:
+  contents: read
+  checks: read
+  pull-requests: read
+concurrency:
+  group: trusted-integration-${{ github.repository }}
+  cancel-in-progress: false
+jobs:
+  merge-development:
+    runs-on: ubuntu-latest
+    environment: trusted-integration
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Verify immutable evidence and enforced GitHub rulesets
+        env:
+          GH_TOKEN: ${{ secrets.INTEGRATION_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ inputs.pr_number }}
+          REVIEW_APP_ID: ${{ vars.AGENTDEV_REVIEW_APP_ID }}
+          ACTIONS_APP_ID: ${{ vars.AGENTDEV_ACTIONS_APP_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$GH_TOKEN" || { echo 'BLOCKED: dedicated integration credential missing'; exit 1; }
+          test -n "$REVIEW_APP_ID" || { echo 'BLOCKED: trusted reviewer App ID missing'; exit 1; }
+          test -n "$ACTIONS_APP_ID" || { echo 'BLOCKED: GitHub Actions App ID missing'; exit 1; }
+          gh pr view "$PR" --repo "$REPO" --json baseRefName,baseRefOid,headRefOid,isDraft,author > "$RUNNER_TEMP/pr.json"
+          SHA=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["headRefOid"])' "$RUNNER_TEMP/pr.json")
+          BASE=$(gh api "repos/$REPO/git/ref/heads/development" --jq '.object.sha')
+          gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" > "$RUNNER_TEMP/checks.json"
+          gh api "repos/$REPO/compare/$BASE...$SHA" > "$RUNNER_TEMP/compare.json"
+          gh api "repos/$REPO/rulesets?includes_parents=true" > "$RUNNER_TEMP/ruleset-list.json"
+          python3 - "$RUNNER_TEMP/ruleset-list.json" "$RUNNER_TEMP/ids.txt" <<'PY'
+          import json, sys
+          rulesets = json.load(open(sys.argv[1]))
+          if not rulesets:
+              sys.exit('BLOCKED: no queryable branch rulesets')
+          with open(sys.argv[2], 'w') as output:
+              for policy in rulesets:
+                  if policy.get('enforcement') == 'active':
+                      print(policy['id'], file=output)
+          PY
+          : > "$RUNNER_TEMP/rulesets.jsonl"
+          while IFS= read -r id; do
+            gh api "repos/$REPO/rulesets/$id" >> "$RUNNER_TEMP/rulesets.jsonl"
+            printf '\n' >> "$RUNNER_TEMP/rulesets.jsonl"
+          done < "$RUNNER_TEMP/ids.txt"
+          python3 - "$RUNNER_TEMP" "$BASE" <<'PY'
+          import json, pathlib, sys
+          temp = pathlib.Path(sys.argv[1])
+          data = {
+              'pr': json.loads((temp / 'pr.json').read_text()),
+              'checks': json.loads((temp / 'checks.json').read_text()),
+              'compare': json.loads((temp / 'compare.json').read_text()),
+              'rulesets': [json.loads(line) for line in (temp / 'rulesets.jsonl').read_text().splitlines() if line],
+              'development_sha': sys.argv[2],
+          }
+          (temp / 'evidence.json').write_text(json.dumps(data))
+          PY
+          if [[ -f .agentdev-profile ]]; then
+            profile="$(cat .agentdev-profile)"
+            [[ "$profile" =~ ^(python|rust|cpp|dotnet)$ ]] || { echo 'BLOCKED: unknown profile'; exit 1; }
+            smoke=("$profile-smoke")
+          else
+            smoke=(python-smoke rust-smoke cpp-smoke dotnet-smoke)
+          fi
+          python3 -m agentdev gate-integration --evidence-json "$RUNNER_TEMP/evidence.json" \
+            --trusted-review-app-id "$REVIEW_APP_ID" --actions-app-id "$ACTIONS_APP_ID" \
+            --required-smoke "${smoke[@]}"
+          # GitHub evaluates its required branch rules again; sha rejects racing PR head updates.
+          gh api -X PUT "repos/$REPO/pulls/$PR/merge" -f sha="$SHA" -f merge_method=squash
+          echo 'Merge accepted. Integrated development CI must pass before issue Done.'

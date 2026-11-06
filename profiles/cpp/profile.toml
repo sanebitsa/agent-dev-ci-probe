@@ -1,0 +1,8 @@
+name = "cpp"
+[commands]
+setup = ["cmake", "-S", ".", "-B", "build", "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"]
+format_check = ["clang-format", "--dry-run", "--Werror", "src/main.cpp", "tests/test_sum.cpp"]
+lint = ["clang-tidy", "-p", "build", "src/main.cpp", "tests/test_sum.cpp", "--warnings-as-errors=*"]
+static = ["cmake", "--build", "build", "--config", "Release"]
+test = ["ctest", "--test-dir", "build", "--output-on-failure"]
+build = ["cmake", "--build", "build", "--config", "Release"]

@@ -1,0 +1,9 @@
+{
+  "branch": "main",
+  "requires": ["pull_request", "required_status_checks", "non_fast_forward", "deletion", "human_release_authorization"],
+  "required_check_names": ["release-candidate", "secret-scan"],
+  "allowed_merge_identity": "human release owner only",
+  "direct_agent_push_allowed": false,
+  "force_push_allowed": false,
+  "note": "Desired policy only; configure identity and ruleset enforcement via GitHub administrator."
+}

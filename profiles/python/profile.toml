@@ -1,0 +1,8 @@
+name = "python"
+[commands]
+setup = ["python", "-m", "pip", "install", "-e", ".[dev]"]
+format_check = ["ruff", "format", "--check", "."]
+lint = ["ruff", "check", "."]
+static = ["pyright", "."]
+test = ["python", "-m", "pytest", "-q"]
+build = ["python", "-m", "build"]

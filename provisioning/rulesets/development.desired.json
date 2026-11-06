@@ -1,0 +1,15 @@
+{
+  "branch": "development",
+  "requires": ["pull_request", "required_status_checks", "non_fast_forward", "deletion"],
+  "required_check_names": ["template-contracts", "secret-scan", "agent-independent-review"],
+  "required_review_check": {
+    "check_name": "agent-independent-review",
+    "source": "separately installed GitHub App, pinned by integration_id",
+    "exact_sha": true,
+    "self_approval_allowed": false
+  },
+  "direct_agent_push_allowed": false,
+  "force_push_allowed": false,
+  "bypass_allowed_for_implementers": false,
+  "note": "Desired policy, not a deployable GitHub ruleset API payload. Verify installed rulesets separately."
+}

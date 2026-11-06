@@ -1,0 +1,108 @@
+name: CI
+on:
+  push:
+    branches: [development, "agent/**"]
+  pull_request:
+    branches: [development, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  detect-profiles:
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.detect.outputs.python }}
+      rust: ${{ steps.detect.outputs.rust }}
+      cpp: ${{ steps.detect.outputs.cpp }}
+      dotnet: ${{ steps.detect.outputs.dotnet }}
+      root: ${{ steps.detect.outputs.root }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f .agentdev-profile ]]; then
+            profile="$(cat .agentdev-profile)"
+            echo 'root=.' >> "$GITHUB_OUTPUT"
+            for lang in python rust cpp dotnet; do
+              if [[ "$lang" == "$profile" ]]; then echo "$lang=true" >> "$GITHUB_OUTPUT"
+              else echo "$lang=false" >> "$GITHUB_OUTPUT"; fi
+            done
+          else
+            echo 'root=examples' >> "$GITHUB_OUTPUT"
+            for lang in python rust cpp dotnet; do echo "$lang=true" >> "$GITHUB_OUTPUT"; done
+          fi
+  template-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m agentdev validate
+      - name: Execute foundation tests when present
+        shell: bash
+        run: |
+          if [ -f tests/test_contracts.py ]; then
+            python -m unittest discover -s tests -p 'test_*.py' -v
+          fi
+  python-smoke:
+    needs: detect-profiles
+    if: ${{ needs.detect-profiles.outputs.python == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m agentdev verify --profile python --project "$PROJECT" --include-setup
+        env:
+          PROJECT: ${{ needs.detect-profiles.outputs.root == 'examples' && 'examples/python' || '.' }}
+  rust-smoke:
+    needs: detect-profiles
+    if: ${{ needs.detect-profiles.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: rustup component add rustfmt clippy
+      - run: python3 -m agentdev verify --profile rust --project "$PROJECT" --include-setup
+        env:
+          PROJECT: ${{ needs.detect-profiles.outputs.root == 'examples' && 'examples/rust' || '.' }}
+  cpp-smoke:
+    needs: detect-profiles
+    if: ${{ needs.detect-profiles.outputs.cpp == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y clang-format clang-tidy cmake ninja-build
+      - run: python3 -m agentdev verify --profile cpp --project "$PROJECT" --include-setup
+        env:
+          PROJECT: ${{ needs.detect-profiles.outputs.root == 'examples' && 'examples/cpp' || '.' }}
+  dotnet-smoke:
+    needs: detect-profiles
+    if: ${{ needs.detect-profiles.outputs.dotnet == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: python3 -m agentdev verify --profile dotnet --project "$PROJECT" --include-setup
+        env:
+          PROJECT: ${{ needs.detect-profiles.outputs.root == 'examples' && 'examples/dotnet' || '.' }}

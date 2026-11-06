@@ -1,0 +1,8 @@
+name = "rust"
+[commands]
+setup = ["cargo", "fetch", "--locked"]
+format_check = ["cargo", "fmt", "--all", "--", "--check"]
+lint = ["cargo", "clippy", "--all-targets", "--locked", "--", "-D", "warnings"]
+static = ["cargo", "check", "--locked"]
+test = ["cargo", "test", "--locked"]
+build = ["cargo", "build", "--locked"]

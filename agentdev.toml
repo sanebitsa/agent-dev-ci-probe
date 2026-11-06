@@ -1,0 +1,9 @@
+name = "agent-dev"
+version = "0.1.0"
+default_branch = "main"
+integration_branch = "development"
+max_implementers = 2
+max_implementers_hard_limit = 3
+review_check_name = "agent-independent-review"
+require_trusted_review_app = true
+release_requires_human = true

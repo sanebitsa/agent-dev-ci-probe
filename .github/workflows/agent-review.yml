@@ -1,0 +1,36 @@
+# Diagnostic only. The required protected check must be emitted by the separate trusted GitHub App.
+name: Independent Review Diagnostic
+on:
+  pull_request:
+    branches: [development]
+  workflow_dispatch:
+permissions:
+  contents: read
+  checks: read
+  pull-requests: read
+jobs:
+  review-attestation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Load verifier from human-controlled main branch (not PR head)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Validate external GitHub App check for current head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          REPO: ${{ github.repository }}
+          REVIEW_APP_ID: ${{ vars.AGENTDEV_REVIEW_APP_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$REVIEW_APP_ID" || -z "$SHA" || -z "$AUTHOR" ]]; then
+            echo 'BLOCKED: trusted reviewer App ID or PR metadata missing'
+            exit 1
+          fi
+          gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" > "$RUNNER_TEMP/checks.json"
+          python3 -m agentdev gate-review --checks-json "$RUNNER_TEMP/checks.json" \
+            --sha "$SHA" --trusted-app-id "$REVIEW_APP_ID" --author-login "$AUTHOR"

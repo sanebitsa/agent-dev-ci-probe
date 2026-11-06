@@ -1,0 +1,8 @@
+name = "dotnet"
+[commands]
+setup = ["dotnet", "restore", "AgentDev.slnx"]
+format_check = ["dotnet", "format", "AgentDev.slnx", "--verify-no-changes", "--no-restore"]
+lint = ["dotnet", "build", "AgentDev.slnx", "--no-restore", "-warnaserror"]
+static = ["dotnet", "build", "AgentDev.slnx", "--no-restore", "-warnaserror"]
+test = ["dotnet", "test", "AgentDev.slnx", "--no-restore", "--verbosity", "normal"]
+build = ["dotnet", "build", "AgentDev.slnx", "--no-restore", "-warnaserror"]

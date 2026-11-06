@@ -1,0 +1,19 @@
+# Human-controlled protection of main is configured through GitHub rulesets.
+name: Release Validation
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  release-candidate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify workflow contract consistency
+        run: python3 -m agentdev validate
+      - name: Human authorization remains required
+        run: echo 'Validation does not authorize or perform a release.'

@@ -1,0 +1,65 @@
+name: Agent task
+description: Small independently verifiable vertical slice or explicit HUMAN gate
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: One observable vertical slice within the approved docs/PRD.md
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Execution mode
+      description: HUMAN tasks must never enter the automated AFK queue
+      options: [AFK, HUMAN]
+    validations:
+      required: true
+  - type: input
+    id: milestone
+    attributes:
+      label: Milestone and priority
+      description: Link to the approved docs/KANBAN.md plan
+    validations:
+      required: true
+  - type: input
+    id: prd_refs
+    attributes:
+      label: PRD requirements
+      description: Stable requirement identifiers in docs/PRD.md
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria and required evidence
+      description: Explicit pass/fail behavior and observable tests
+    validations:
+      required: true
+  - type: textarea
+    id: human_gate
+    attributes:
+      label: HUMAN gate (when applicable)
+      description: Specify the required human decision, authorizer and verification evidence. Write "None" for AFK tasks.
+    validations:
+      required: true
+  - type: input
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Issue numbers verified Done (or none); HUMAN predecessors need recorded evidence
+  - type: input
+    id: write_paths
+    attributes:
+      label: Expected write boundaries
+      description: Relative repository paths (use N/A for HUMAN-only tasks)
+    validations:
+      required: true
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk
+      options: [standard, elevated, restricted]
+    validations:
+      required: true

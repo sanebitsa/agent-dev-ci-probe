@@ -1,0 +1,11 @@
+# Documentation scaffold; authoritative runtime settings are agentdev.toml.
+project_name: "{{PROJECT_NAME}}"
+profile: python  # python | rust | cpp | dotnet
+integration_branch: development
+release_branch: main
+max_parallel_implementers: 2
+review:
+  required: true
+  trust_source: external_github_app
+release:
+  human_authorization_required: true
